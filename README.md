@@ -64,8 +64,8 @@ chiroti.ask(
     data="trial1.csv",
 )
 
-# multiple CSVs are appended together into one table (they must share the
-# same columns)
+# pass several files at once — each keeps its own data independent of the
+# others, keyed by filename; they don't need matching columns
 chiroti.ask("Summarize across all trials.", data=["trial1.csv", "trial2.csv", "trial3.csv"])
 
 # .npz arrays work too — small arrays are included in full, large arrays
@@ -75,9 +75,9 @@ chiroti.ask("How many spikes, and what's the average inter-spike interval?", dat
 ```
 
 Notes:
-- CSVs being combined must have identical columns — a mismatch raises
-  `chiroti.exceptions.InvalidInputError` naming the offending file.
-- There's a row cap across all combined CSVs (2000 rows) and an inline-value
+- Each CSV/NPZ file is kept under its own filename key in the JSON block —
+  they're independent of each other and don't need matching columns.
+- There's a row cap per CSV file (2000 rows) and an inline-value
   cap for NPZ arrays (200 values) before Chiroti falls back to summary
   statistics instead of the raw values — both fail with a clear error/summary
   rather than silently truncating.

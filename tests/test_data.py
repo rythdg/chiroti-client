@@ -18,34 +18,24 @@ def test_single_csv_produces_json_with_rows(tmp_path):
     text = data_to_text([str(path)])
     payload = json.loads(text.split("```json\n")[1].split("\n```")[0])
 
-    assert payload["csv_data"]["columns"] == ["x", "y"]
-    assert payload["csv_data"]["rows"] == [{"x": "1", "y": "2"}, {"x": "3", "y": "4"}]
+    assert payload["csv_data"]["a.csv"]["columns"] == ["x", "y"]
+    assert payload["csv_data"]["a.csv"]["rows"] == [{"x": "1", "y": "2"}, {"x": "3", "y": "4"}]
 
 
-def test_multiple_csvs_are_appended_into_one_table(tmp_path):
+def test_multiple_csvs_are_kept_independent_under_their_own_filename(tmp_path):
     a = tmp_path / "a.csv"
     b = tmp_path / "b.csv"
     _write_csv(a, ["x", "y"], [["1", "2"]])
-    _write_csv(b, ["x", "y"], [["3", "4"]])
+    _write_csv(b, ["p", "q", "r"], [["3", "4", "5"]])
 
     text = data_to_text([str(a), str(b)])
     payload = json.loads(text.split("```json\n")[1].split("\n```")[0])
 
-    assert payload["csv_data"]["rows"] == [{"x": "1", "y": "2"}, {"x": "3", "y": "4"}]
-    assert payload["csv_data"]["source_files"] == ["a.csv", "b.csv"]
+    assert payload["csv_data"]["a.csv"]["rows"] == [{"x": "1", "y": "2"}]
+    assert payload["csv_data"]["b.csv"]["rows"] == [{"p": "3", "q": "4", "r": "5"}]
 
 
-def test_csv_mismatched_columns_raises_invalid_input_error(tmp_path):
-    a = tmp_path / "a.csv"
-    b = tmp_path / "b.csv"
-    _write_csv(a, ["x", "y"], [["1", "2"]])
-    _write_csv(b, ["x", "z"], [["3", "4"]])
-
-    with pytest.raises(InvalidInputError):
-        data_to_text([str(a), str(b)])
-
-
-def test_csv_row_limit_enforced(tmp_path):
+def test_csv_row_limit_enforced_per_file(tmp_path):
     path = tmp_path / "a.csv"
     rows = [["1"] for _ in range(MAX_CSV_ROWS + 1)]
     _write_csv(path, ["x"], rows)

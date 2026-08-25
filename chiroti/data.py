@@ -18,31 +18,14 @@ MAX_CSV_ROWS = 2000
 MAX_NPZ_INLINE_VALUES = 200
 
 
-def _read_csv_rows(path: Path) -> list[dict]:
+def _csv_file_to_json(path: Path) -> dict:
     with path.open(newline="") as f:
         rows = list(csv_module.DictReader(f))
     if not rows:
         raise InvalidInputError(f"{path} is empty")
-    return rows
-
-
-def _csv_files_to_json(paths: list[Path]) -> dict:
-    columns = None
-    all_rows = []
-    for path in paths:
-        rows = _read_csv_rows(path)
-        if columns is None:
-            columns = list(rows[0].keys())
-        elif list(rows[0].keys()) != columns:
-            raise InvalidInputError(
-                f"{path} has different columns than {paths[0]}: {list(rows[0].keys())} vs {columns}"
-            )
-        all_rows.extend(rows)
-
-    if len(all_rows) > MAX_CSV_ROWS:
-        raise InvalidInputError(f"{len(all_rows)} rows across all csv files exceeds the {MAX_CSV_ROWS}-row limit")
-
-    return {"source_files": [p.name for p in paths], "columns": columns, "rows": all_rows}
+    if len(rows) > MAX_CSV_ROWS:
+        raise InvalidInputError(f"{path} has {len(rows)} rows, exceeding the {MAX_CSV_ROWS}-row limit")
+    return {"columns": list(rows[0].keys()), "rows": rows}
 
 
 def _npz_file_to_json(path: Path) -> dict:
@@ -64,7 +47,7 @@ def _npz_file_to_json(path: Path) -> dict:
 
 
 def data_to_text(paths: list[str]) -> str:
-    """CSVs are appended into one table; each NPZ is described separately."""
+    """Each file is described under its own filename key — independent of the others."""
     resolved = [Path(p) for p in paths]
     csv_paths = [p for p in resolved if p.suffix.lower() == ".csv"]
     npz_paths = [p for p in resolved if p.suffix.lower() == ".npz"]
@@ -74,7 +57,7 @@ def data_to_text(paths: list[str]) -> str:
 
     payload = {}
     if csv_paths:
-        payload["csv_data"] = _csv_files_to_json(csv_paths)
+        payload["csv_data"] = {p.name: _csv_file_to_json(p) for p in csv_paths}
     if npz_paths:
         payload["npz_data"] = {p.name: _npz_file_to_json(p) for p in npz_paths}
 
