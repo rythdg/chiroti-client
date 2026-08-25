@@ -1,8 +1,20 @@
 import httpx
 import pytest
+from pydantic import BaseModel
 
 from chiroti import client, config
-from chiroti.exceptions import AuthenticationError, ChirotiConnectionError, InferenceError
+from chiroti.exceptions import (
+    AuthenticationError,
+    ChirotiConnectionError,
+    InferenceError,
+    OutputValidationError,
+    UnsupportedFeatureError,
+)
+
+
+class Experiment(BaseModel):
+    organism: str
+    temperature: float
 
 
 class FakeResponse:
@@ -67,6 +79,55 @@ def test_client_timeout_raises_inference_error(monkeypatch, configured):
 
     with pytest.raises(InferenceError):
         client.ask("hi")
+
+
+def test_client_output_format_sends_json_schema_and_parses_response(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": '{"organism": "mouse", "temperature": 37.0}', "model": "qwen-text"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    result = client.ask("Extract conditions.", output_format=Experiment)
+
+    assert captured["json"]["output_format"] == Experiment.model_json_schema()
+    assert result == Experiment(organism="mouse", temperature=37.0)
+
+
+def test_client_output_format_invalid_response_raises_output_validation_error_with_raw_text(monkeypatch, configured):
+    monkeypatch.setattr(httpx, "request", lambda *a, **k: FakeResponse(200, {"text": "not json", "model": "m"}))
+
+    with pytest.raises(OutputValidationError) as exc_info:
+        client.ask("Extract conditions.", output_format=Experiment)
+    assert exc_info.value.raw_text == "not json"
+
+
+def test_client_output_format_on_unsupported_model_raises_unsupported_feature_error(monkeypatch, configured):
+    monkeypatch.setattr(
+        httpx, "request", lambda *a, **k: FakeResponse(422, {"message": "does not support structured output"})
+    )
+
+    with pytest.raises(UnsupportedFeatureError):
+        client.ask("Extract conditions.", output_format=Experiment)
+
+
+def test_client_ask_data_appends_json_block_to_prompt(monkeypatch, configured, tmp_path):
+    csv_path = tmp_path / "a.csv"
+    csv_path.write_text("x,y\n1,2\n")
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("Summarize.", data=str(csv_path))
+
+    assert captured["json"]["prompt"].startswith("Summarize.\n\n### Data\n```json")
+    assert '"x": "1"' in captured["json"]["prompt"]
 
 
 def test_client_config_precedence(monkeypatch, tmp_path):
