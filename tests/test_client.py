@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from chiroti import client, config
-from chiroti.exceptions import AuthenticationError, ChirotiConnectionError
+from chiroti.exceptions import AuthenticationError, ChirotiConnectionError, InferenceError
 
 
 class FakeResponse:
@@ -56,6 +56,16 @@ def test_client_connection_refused_raises_chiroti_connection_error(monkeypatch, 
     monkeypatch.setattr(httpx, "request", raise_connect_error)
 
     with pytest.raises(ChirotiConnectionError):
+        client.ask("hi")
+
+
+def test_client_timeout_raises_inference_error(monkeypatch, configured):
+    def raise_timeout(*args, **kwargs):
+        raise httpx.ReadTimeout("no response")
+
+    monkeypatch.setattr(httpx, "request", raise_timeout)
+
+    with pytest.raises(InferenceError):
         client.ask("hi")
 
 

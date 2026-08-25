@@ -20,14 +20,19 @@ _STATUS_TO_ERROR = {
     502: InferenceError,
 }
 
+# httpx's default is 5s, far too short for LLM generation; give it minutes instead.
+_DEFAULT_TIMEOUT_SECONDS = 300.0
+
 
 def _request(method: str, path: str, **kwargs: Any) -> Any:
     url = f"{get_server().rstrip('/')}{path}"
     headers = {"Authorization": f"Bearer {get_token()}"}
     try:
-        response = httpx.request(method, url, headers=headers, **kwargs)
+        response = httpx.request(method, url, headers=headers, timeout=_DEFAULT_TIMEOUT_SECONDS, **kwargs)
     except httpx.ConnectError as e:
         raise ChirotiConnectionError(f"could not reach {url}: {e}")
+    except httpx.TimeoutException as e:
+        raise InferenceError(f"no response from {url} within {_DEFAULT_TIMEOUT_SECONDS:.0f}s: {e}")
 
     if response.is_success:
         return response.json()
