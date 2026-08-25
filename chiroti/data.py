@@ -14,17 +14,12 @@ import numpy as np
 
 from chiroti.exceptions import InvalidInputError
 
-MAX_CSV_ROWS = 2000
-MAX_NPZ_INLINE_VALUES = 200
-
 
 def _csv_file_to_json(path: Path) -> dict:
     with path.open(newline="") as f:
         rows = list(csv_module.DictReader(f))
     if not rows:
         raise InvalidInputError(f"{path} is empty")
-    if len(rows) > MAX_CSV_ROWS:
-        raise InvalidInputError(f"{path} has {len(rows)} rows, exceeding the {MAX_CSV_ROWS}-row limit")
     return {"columns": list(rows[0].keys()), "rows": rows}
 
 
@@ -33,16 +28,7 @@ def _npz_file_to_json(path: Path) -> dict:
     arrays = {}
     for name in archive.files:
         arr = archive[name]
-        entry = {"shape": list(arr.shape), "dtype": str(arr.dtype)}
-        if arr.size <= MAX_NPZ_INLINE_VALUES:
-            entry["values"] = arr.tolist()
-        else:
-            flat = arr.reshape(-1)
-            entry["stats"] = {
-                "min": float(flat.min()), "max": float(flat.max()),
-                "mean": float(flat.mean()), "std": float(flat.std()),
-            }
-        arrays[name] = entry
+        arrays[name] = {"shape": list(arr.shape), "dtype": str(arr.dtype), "values": arr.tolist()}
     return arrays
 
 

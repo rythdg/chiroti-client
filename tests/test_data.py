@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pytest
 
-from chiroti.data import MAX_CSV_ROWS, data_to_text
+from chiroti.data import data_to_text
 from chiroti.exceptions import InvalidInputError
 
 
@@ -35,37 +35,25 @@ def test_multiple_csvs_are_kept_independent_under_their_own_filename(tmp_path):
     assert payload["csv_data"]["b.csv"]["rows"] == [{"p": "3", "q": "4", "r": "5"}]
 
 
-def test_csv_row_limit_enforced_per_file(tmp_path):
+def test_large_csv_is_not_truncated(tmp_path):
     path = tmp_path / "a.csv"
-    rows = [["1"] for _ in range(MAX_CSV_ROWS + 1)]
+    rows = [[str(i)] for i in range(5000)]
     _write_csv(path, ["x"], rows)
 
-    with pytest.raises(InvalidInputError):
-        data_to_text([str(path)])
+    text = data_to_text([str(path)])
+    payload = json.loads(text.split("```json\n")[1].split("\n```")[0])
+
+    assert len(payload["csv_data"]["a.csv"]["rows"]) == 5000
 
 
-def test_small_npz_array_included_inline(tmp_path):
+def test_npz_array_included_in_full_regardless_of_size(tmp_path):
     path = tmp_path / "a.npz"
-    np.savez(path, values=np.array([1, 2, 3]))
+    np.savez(path, values=np.arange(5000, dtype="float64"))
 
     text = data_to_text([str(path)])
     payload = json.loads(text.split("```json\n")[1].split("\n```")[0])
 
-    assert payload["npz_data"]["a.npz"]["values"]["values"] == [1, 2, 3]
-    assert "stats" not in payload["npz_data"]["a.npz"]["values"]
-
-
-def test_large_npz_array_summarized_with_stats(tmp_path):
-    path = tmp_path / "a.npz"
-    np.savez(path, values=np.arange(1000, dtype="float64"))
-
-    text = data_to_text([str(path)])
-    payload = json.loads(text.split("```json\n")[1].split("\n```")[0])
-
-    entry = payload["npz_data"]["a.npz"]["values"]
-    assert "values" not in entry
-    assert entry["stats"]["min"] == 0.0
-    assert entry["stats"]["max"] == 999.0
+    assert payload["npz_data"]["a.npz"]["values"]["values"] == [float(i) for i in range(5000)]
 
 
 def test_unsupported_file_type_rejected(tmp_path):

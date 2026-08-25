@@ -77,10 +77,10 @@ chiroti.ask("How many spikes, and what's the average inter-spike interval?", dat
 Notes:
 - Each CSV/NPZ file is kept under its own filename key in the JSON block —
   they're independent of each other and don't need matching columns.
-- There's a row cap per CSV file (2000 rows) and an inline-value
-  cap for NPZ arrays (200 values) before Chiroti falls back to summary
-  statistics instead of the raw values — both fail with a clear error/summary
-  rather than silently truncating.
+- No row/size cap is applied — the whole file is always included in full.
+  If your data is too large for the model's context window, the request
+  fails there (a clear error naming the problem), not via a silent
+  client-side truncation.
 - This is pure client-side text preparation. No file is uploaded anywhere;
   Chiroti just builds a bigger text prompt.
 
