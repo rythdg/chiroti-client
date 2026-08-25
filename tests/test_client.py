@@ -51,7 +51,7 @@ def test_client_ask_success(monkeypatch, configured):
     assert result == "hello"
     assert captured["url"] == "http://chiroti:8100/ask"
     assert captured["headers"] == {"Authorization": "Bearer test-token"}
-    assert captured["json"] == {"prompt": "hi"}
+    assert captured["json"] == {"prompt": "hi", "reasoning": True}
 
 
 def test_client_ask_auth_error_raises_authentication_error(monkeypatch, configured):
@@ -130,6 +130,25 @@ def test_client_ask_data_appends_json_block_to_prompt(monkeypatch, configured, t
     assert '"x": "1"' in captured["json"]["prompt"]
 
 
+def test_client_get_server_defaults_to_chiroti_host_when_unconfigured(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "nonexistent.json")
+    assert config.get_server() == config.DEFAULT_SERVER == "http://chiroti:8100"
+
+
+def test_client_ask_reasoning_false_included_in_payload(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("hi", reasoning=False)
+
+    assert captured["json"]["reasoning"] is False
+
+
 def test_client_config_precedence(monkeypatch, tmp_path):
     config_file = tmp_path / "config.json"
     config_file.write_text('{"server": "http://from-file", "token": "file-token"}')
@@ -157,6 +176,7 @@ def test_client_ask_passes_arbitrary_openai_kwargs_through_unmodified(monkeypatc
 
     assert captured["json"] == {
         "prompt": "hi",
+        "reasoning": True,
         "temperature": 0.9,
         "top_p": 0.95,
         "stop": ["\n\n"],

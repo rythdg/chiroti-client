@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 CONFIG_FILE = Path.home() / ".chiroti" / "config.json"
+DEFAULT_SERVER = "http://chiroti:8100"
 
 _overrides = {}
 
@@ -23,10 +24,7 @@ def _from_file(key: str) -> str | None:
 
 
 def get_server() -> str:
-    value = _overrides.get("server") or os.environ.get("CHIROTI_SERVER") or _from_file("server")
-    if not value:
-        raise RuntimeError("No Chiroti server configured — set CHIROTI_SERVER or call chiroti.configure(server=...)")
-    return value
+    return _overrides.get("server") or os.environ.get("CHIROTI_SERVER") or _from_file("server") or DEFAULT_SERVER
 
 
 def get_token() -> str:

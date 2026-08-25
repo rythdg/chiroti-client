@@ -12,8 +12,15 @@ pip install git+https://github.com/rythdg/chiroti-client.git
 
 ## Configure
 
-Set these once (env vars, or a `~/.chiroti/config.json` file, or a
-`chiroti.configure()` call — see precedence below):
+`CHIROTI_SERVER` defaults to `http://chiroti:8100`, so on the lab LAN you
+usually only need to set your token:
+
+```bash
+export CHIROTI_TOKEN="<ask Ryth for the current token>"
+```
+
+Only override the server if you're pointing at something else (e.g. testing
+against a locally-run instance):
 
 ```bash
 export CHIROTI_SERVER="http://chiroti:8100"
@@ -24,11 +31,13 @@ or, in code:
 
 ```python
 import chiroti
-chiroti.configure(server="http://chiroti:8100", token="...")
+chiroti.configure(token="...")            # server already defaults correctly
+chiroti.configure(server="...", token="...")  # only if you need to override the server too
 ```
 
-Precedence when more than one is set: explicit `configure()` call > env var >
-`~/.chiroti/config.json` > (no default — you must set one of these).
+Precedence: explicit `configure()` call > env var > `~/.chiroti/config.json` >
+default (`http://chiroti:8100` for the server; the token has no default —
+you must set one).
 
 ## Basic usage
 
@@ -68,9 +77,7 @@ chiroti.ask(
 # others, keyed by filename; they don't need matching columns
 chiroti.ask("Summarize across all trials.", data=["trial1.csv", "trial2.csv", "trial3.csv"])
 
-# .npz arrays work too — small arrays are included in full, large arrays
-# are summarized (shape/dtype/min/max/mean/std) so you don't blow the
-# model's context window
+# .npz arrays work too — always included in full (shape, dtype, values)
 chiroti.ask("How many spikes, and what's the average inter-spike interval?", data="spikes.npz")
 ```
 
@@ -110,9 +117,23 @@ output doesn't validate against your schema, you get
 `chiroti.exceptions.OutputValidationError` — the raw text it returned is on
 `error.raw_text` for debugging.
 
+## Skipping the model's "thinking" pass — `reasoning=`
+
+Some models generate an internal reasoning/"thinking" pass before their
+actual answer. `reasoning` defaults to `True`; set it to `False` to skip
+that pass — useful when you just want a fast, direct answer and don't need
+the model to reason step by step:
+
+```python
+chiroti.ask("What is 12 * 8?", reasoning=False)
+```
+
+If the currently hosted model has no thinking mode at all, `reasoning=`
+is simply a no-op — there's nothing to toggle, so it doesn't raise an error.
+
 ## What doesn't work yet
 
-`image=`, `document=` (PDF/ZIP), `reasoning=`, and `cache=` are accepted by
+`image=`, `document=` (PDF/ZIP), and `cache=` are accepted by
 `ask()`'s signature but raise `NotImplementedError` if you actually pass a
 value — they're reserved names for features not built yet, not silently
 ignored.

@@ -56,7 +56,7 @@ def ask(
     document=None,
     data: str | Path | list[str | Path] | None = None,
     max_tokens: int | None = None,
-    reasoning: bool | None = None,
+    reasoning: bool = True,
     output_format: type[BaseModel] | None = None,
     cache: bool | None = None,
     **openai_kwargs: Any,
@@ -64,7 +64,7 @@ def ask(
     if not prompt.strip():
         raise InvalidInputError("prompt must not be empty")
 
-    not_yet_implemented = {"image": image, "document": document, "reasoning": reasoning, "cache": cache}
+    not_yet_implemented = {"image": image, "document": document, "cache": cache}
     for name, value in not_yet_implemented.items():
         if value is not None:
             raise NotImplementedError(f"{name}= is not implemented yet")
@@ -73,7 +73,7 @@ def ask(
         paths = [data] if isinstance(data, (str, Path)) else list(data)
         prompt = f"{prompt}\n\n{data_to_text(paths)}"
 
-    payload = {"prompt": prompt, **openai_kwargs}
+    payload = {"prompt": prompt, "reasoning": reasoning, **openai_kwargs}
     if model is not None:
         payload["model"] = model
     if max_tokens is not None:
