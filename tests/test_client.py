@@ -48,7 +48,8 @@ def test_client_ask_success(monkeypatch, configured):
 
     result = client.ask("hi")
 
-    assert result == "hello"
+    assert result.text == "hello"
+    assert str(result) == "hello"
     assert captured["url"] == "http://chiroti:8100/ask"
     assert captured["headers"] == {"Authorization": "Bearer test-token"}
     assert captured["json"] == {"prompt": "hi", "reasoning": True}
@@ -93,7 +94,8 @@ def test_client_output_format_sends_json_schema_and_parses_response(monkeypatch,
     result = client.ask("Extract conditions.", output_format=Experiment)
 
     assert captured["json"]["output_format"] == Experiment.model_json_schema()
-    assert result == Experiment(organism="mouse", temperature=37.0)
+    assert result.parsed == Experiment(organism="mouse", temperature=37.0)
+    assert result.text == '{"organism": "mouse", "temperature": 37.0}'
 
 
 def test_client_output_format_invalid_response_raises_output_validation_error_with_raw_text(monkeypatch, configured):
@@ -147,6 +149,28 @@ def test_client_ask_reasoning_false_included_in_payload(monkeypatch, configured)
     client.ask("hi", reasoning=False)
 
     assert captured["json"]["reasoning"] is False
+
+
+def test_client_ask_response_carries_usage_and_timing_metadata(monkeypatch, configured):
+    monkeypatch.setattr(httpx, "request", lambda *a, **k: FakeResponse(200, {
+        "text": "42",
+        "model": "m",
+        "token_count": 20,
+        "prompt_tokens": 3,
+        "ttft": 0.05,
+        "tps": 100.0,
+        "reasoning": "thinking...",
+    }))
+
+    result = client.ask("hi")
+
+    assert result.text == "42"
+    assert result.token_count == 20
+    assert result.prompt_tokens == 3
+    assert result.ttft == 0.05
+    assert result.tps == 100.0
+    assert result.reasoning == "thinking..."
+    assert result.parsed is None
 
 
 def test_client_config_precedence(monkeypatch, tmp_path):

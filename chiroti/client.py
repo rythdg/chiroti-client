@@ -17,6 +17,7 @@ from chiroti.exceptions import (
     OutputValidationError,
     UnsupportedFeatureError,
 )
+from chiroti.response import ChirotiResponse
 
 _STATUS_TO_ERROR = {
     400: InvalidInputError,
@@ -60,7 +61,7 @@ def ask(
     output_format: type[BaseModel] | None = None,
     cache: bool | None = None,
     **openai_kwargs: Any,
-) -> str | BaseModel:
+) -> ChirotiResponse:
     if not prompt.strip():
         raise InvalidInputError("prompt must not be empty")
 
@@ -81,14 +82,25 @@ def ask(
     if output_format is not None:
         payload["output_format"] = output_format.model_json_schema()
 
-    text = _request("POST", "/ask", json=payload)["text"]
+    body = _request("POST", "/ask", json=payload)
+    text = body["text"]
 
-    if output_format is None:
-        return text
-    try:
-        return output_format.model_validate_json(text)
-    except ValidationError as e:
-        raise OutputValidationError(f"model output didn't match output_format: {e}", raw_text=text) from e
+    parsed = None
+    if output_format is not None:
+        try:
+            parsed = output_format.model_validate_json(text)
+        except ValidationError as e:
+            raise OutputValidationError(f"model output didn't match output_format: {e}", raw_text=text) from e
+
+    return ChirotiResponse(
+        text=text,
+        token_count=body.get("token_count"),
+        prompt_tokens=body.get("prompt_tokens"),
+        ttft=body.get("ttft"),
+        tps=body.get("tps"),
+        reasoning=body.get("reasoning"),
+        parsed=parsed,
+    )
 
 
 def models() -> list[str]:

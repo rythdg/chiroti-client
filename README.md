@@ -44,13 +44,38 @@ you must set one).
 ```python
 import chiroti
 
-chiroti.ask("Why is the sky blue?")
+print(chiroti.ask("Why is the sky blue?"))
 chiroti.ask("Write a haiku.", temperature=0.9, top_p=0.95, stop=["\n\n"])
 ```
 
 `chiroti.ask()` forwards standard OpenAI sampling parameters straight through
 to the model: `temperature`, `top_p`, `n`, `stop`, `presence_penalty`,
 `frequency_penalty`, `seed`, `logprobs`, `top_logprobs`, `max_tokens`.
+
+## What `ask()` returns
+
+`ask()` returns a `ChirotiResponse`, not a plain string — it prints and
+`str()`s exactly like one (`print(chiroti.ask(...))` just works), but if
+you're doing string operations (concatenation, `.split()`, f-strings that
+need a real `str`, ...) use `.text` explicitly:
+
+```python
+result = chiroti.ask("Explain what's happening in this data.", data="trial1.csv")
+
+result.text          # the answer, as a plain string
+result.token_count    # completion tokens (exact count from the model backend)
+result.prompt_tokens  # prompt tokens
+result.ttft            # seconds to first token
+result.tps              # tokens/sec, decode-only (excludes ttft) — comparable
+                         # to what the model server's own logs report
+result.reasoning        # the model's internal "thinking" content, if any
+                         # (None if the model didn't produce any, e.g. reasoning=False)
+result.parsed            # set only when output_format= was used — see below
+```
+
+`token_count`/`prompt_tokens`/`ttft`/`tps` can all be `None` if the backend
+didn't report usage/timing data for that request — never guessed or
+estimated client-side.
 
 ```python
 chiroti.models()   # -> ["qwen-vl-32b"], whichever single model is hosted right now
@@ -93,8 +118,9 @@ Notes:
 
 ## Getting structured output back — `output_format=`
 
-Pass a Pydantic model class, and `ask()` returns an instance of it instead of
-a plain string:
+Pass a Pydantic model class, and the response's `.parsed` attribute holds a
+real instance of it (`.text` still holds the raw JSON text underneath, for
+debugging):
 
 ```python
 from pydantic import BaseModel
@@ -108,7 +134,7 @@ result = chiroti.ask(
     data="trial1.csv",
     output_format=Summary,
 )
-result.mean_voltage_mV   # a real float, not a string you have to parse
+result.parsed.mean_voltage_mV   # a real float, not a string you have to parse
 ```
 
 If the currently hosted model doesn't support structured output, you get
