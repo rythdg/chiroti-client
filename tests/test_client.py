@@ -228,17 +228,33 @@ def test_labnotes_sends_only_explicitly_passed_filters(monkeypatch, configured):
 
     assert captured["json"] == {
         "question": "What did Tannishtha find?",
+        "reasoning": True,
         "author": "tannishtha",
         "type": "bhalla_lab_note",
     }
     assert captured["timeout"] == client._LABNOTES_TIMEOUT_SECONDS
 
 
-def test_labnotes_parses_answer_sources_and_attachments(monkeypatch, configured):
+def test_labnotes_reasoning_false_included_in_payload(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"answer": "ok", "sources": [], "attachments": []})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.labnotes("hi", reasoning=False)
+
+    assert captured["json"]["reasoning"] is False
+
+
+def test_labnotes_parses_answer_sources_attachments_and_usage(monkeypatch, configured):
     monkeypatch.setattr(httpx, "request", lambda *a, **k: FakeResponse(200, {
         "answer": "CaMKII levels rose after stimulation.",
         "sources": [{"nid": 17, "title": "t", "author": "tannishtha", "created": "2020-01-01", "type": "bhalla_lab_note"}],
         "attachments": [{"content_type": "image/png", "size_bytes": 3, "data_base64": "abc"}],
+        "usage": {"iterations": 3, "total_prompt_tokens": 500, "total_completion_tokens": 200, "total_time": 12.3},
     }))
 
     result = client.labnotes("What did Tannishtha find?")
@@ -247,6 +263,8 @@ def test_labnotes_parses_answer_sources_and_attachments(monkeypatch, configured)
     assert str(result) == result.answer
     assert result.sources[0]["nid"] == 17
     assert result.attachments[0]["content_type"] == "image/png"
+    assert result.usage["iterations"] == 3
+    assert result.usage["total_time"] == 12.3
 
 
 def test_labnotes_error_mapping_reuses_status_to_error(monkeypatch, configured):

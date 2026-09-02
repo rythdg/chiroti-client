@@ -25,6 +25,8 @@ class LabnotesResponse:
     answer: str
     sources: list = field(default_factory=list)       # {nid, title, author, created, type} dicts the answer relies on
     attachments: list = field(default_factory=list)   # images/attachments fetched while answering, base64-encoded
+    usage: dict = field(default_factory=dict)          # iterations, total_prompt_tokens, total_completion_tokens,
+                                                         # total_time, and a per-call breakdown under "calls"
 
     def __str__(self) -> str:
         return self.answer

@@ -121,6 +121,7 @@ def labnotes(
     keyword: str | None = None,
     text: str | None = None,
     limit: int | None = None,
+    reasoning: bool = True,
 ) -> LabnotesResponse:
     """Answers a natural-language question over Bhalla Lab notes. Any filter
     passed here (author=, type=, ...) is a hard constraint the server enforces
@@ -128,7 +129,7 @@ def labnotes(
     if not question.strip():
         raise InvalidInputError("question must not be empty")
 
-    payload = {"question": question}
+    payload = {"question": question, "reasoning": reasoning}
     for key, value in {
         "type": type, "author": author, "title": title,
         "created_from": created_from, "created_to": created_to,
@@ -138,4 +139,9 @@ def labnotes(
             payload[key] = value
 
     body = _request("POST", "/labnotes", json=payload, timeout=_LABNOTES_TIMEOUT_SECONDS)
-    return LabnotesResponse(answer=body["answer"], sources=body.get("sources", []), attachments=body.get("attachments", []))
+    return LabnotesResponse(
+        answer=body["answer"],
+        sources=body.get("sources", []),
+        attachments=body.get("attachments", []),
+        usage=body.get("usage", {}),
+    )
