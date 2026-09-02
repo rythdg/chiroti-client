@@ -7,6 +7,7 @@ from chiroti.exceptions import (
     AuthenticationError,
     ChirotiConnectionError,
     InferenceError,
+    InvalidInputError,
     OutputValidationError,
     UnsupportedFeatureError,
 )
@@ -206,3 +207,50 @@ def test_client_ask_passes_arbitrary_openai_kwargs_through_unmodified(monkeypatc
         "stop": ["\n\n"],
         "seed": 42,
     }
+
+
+def test_labnotes_empty_question_raises_invalid_input_error(configured):
+    with pytest.raises(InvalidInputError):
+        client.labnotes("")
+
+
+def test_labnotes_sends_only_explicitly_passed_filters(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        captured["timeout"] = timeout
+        return FakeResponse(200, {"answer": "the answer", "sources": [], "attachments": []})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.labnotes("What did Tannishtha find?", author="tannishtha", type="bhalla_lab_note")
+
+    assert captured["json"] == {
+        "question": "What did Tannishtha find?",
+        "author": "tannishtha",
+        "type": "bhalla_lab_note",
+    }
+    assert captured["timeout"] == client._LABNOTES_TIMEOUT_SECONDS
+
+
+def test_labnotes_parses_answer_sources_and_attachments(monkeypatch, configured):
+    monkeypatch.setattr(httpx, "request", lambda *a, **k: FakeResponse(200, {
+        "answer": "CaMKII levels rose after stimulation.",
+        "sources": [{"nid": 17, "title": "t", "author": "tannishtha", "created": "2020-01-01", "type": "bhalla_lab_note"}],
+        "attachments": [{"content_type": "image/png", "size_bytes": 3, "data_base64": "abc"}],
+    }))
+
+    result = client.labnotes("What did Tannishtha find?")
+
+    assert result.answer == "CaMKII levels rose after stimulation."
+    assert str(result) == result.answer
+    assert result.sources[0]["nid"] == 17
+    assert result.attachments[0]["content_type"] == "image/png"
+
+
+def test_labnotes_error_mapping_reuses_status_to_error(monkeypatch, configured):
+    monkeypatch.setattr(httpx, "request", lambda *a, **k: FakeResponse(422, {"message": "tool calling not supported"}))
+
+    with pytest.raises(UnsupportedFeatureError):
+        client.labnotes("hi")

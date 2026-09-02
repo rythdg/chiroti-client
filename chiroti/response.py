@@ -1,6 +1,6 @@
 """The object chiroti.ask() returns — text plus whatever metadata the server sent."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from pydantic import BaseModel
@@ -18,3 +18,13 @@ class ChirotiResponse:
 
     def __str__(self) -> str:
         return self.text
+
+
+@dataclass
+class LabnotesResponse:
+    answer: str
+    sources: list = field(default_factory=list)       # {nid, title, author, created, type} dicts the answer relies on
+    attachments: list = field(default_factory=list)   # images/attachments fetched while answering, base64-encoded
+
+    def __str__(self) -> str:
+        return self.answer

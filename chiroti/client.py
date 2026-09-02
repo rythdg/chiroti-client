@@ -17,7 +17,7 @@ from chiroti.exceptions import (
     OutputValidationError,
     UnsupportedFeatureError,
 )
-from chiroti.response import ChirotiResponse
+from chiroti.response import ChirotiResponse, LabnotesResponse
 
 _STATUS_TO_ERROR = {
     400: InvalidInputError,
@@ -29,17 +29,19 @@ _STATUS_TO_ERROR = {
 
 # httpx's default is 5s, far too short for LLM generation; give it minutes instead.
 _DEFAULT_TIMEOUT_SECONDS = 300.0
+# labnotes() may run several sequential model + Labnotes API round trips server-side.
+_LABNOTES_TIMEOUT_SECONDS = 900.0
 
 
-def _request(method: str, path: str, **kwargs: Any) -> Any:
+def _request(method: str, path: str, timeout: float = _DEFAULT_TIMEOUT_SECONDS, **kwargs: Any) -> Any:
     url = f"{get_server().rstrip('/')}{path}"
     headers = {"Authorization": f"Bearer {get_token()}"}
     try:
-        response = httpx.request(method, url, headers=headers, timeout=_DEFAULT_TIMEOUT_SECONDS, **kwargs)
+        response = httpx.request(method, url, headers=headers, timeout=timeout, **kwargs)
     except httpx.ConnectError as e:
         raise ChirotiConnectionError(f"could not reach {url}: {e}")
     except httpx.TimeoutException as e:
-        raise InferenceError(f"no response from {url} within {_DEFAULT_TIMEOUT_SECONDS:.0f}s: {e}")
+        raise InferenceError(f"no response from {url} within {timeout:.0f}s: {e}")
 
     if response.is_success:
         return response.json()
@@ -106,3 +108,34 @@ def ask(
 def models() -> list[str]:
     body = _request("GET", "/models")
     return [entry["name"] for entry in body]
+
+
+def labnotes(
+    question: str,
+    *,
+    type: str | None = None,
+    author: str | None = None,
+    title: str | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    keyword: str | None = None,
+    text: str | None = None,
+    limit: int | None = None,
+) -> LabnotesResponse:
+    """Answers a natural-language question over Bhalla Lab notes. Any filter
+    passed here (author=, type=, ...) is a hard constraint the server enforces
+    on every search it runs — the model can only search within it."""
+    if not question.strip():
+        raise InvalidInputError("question must not be empty")
+
+    payload = {"question": question}
+    for key, value in {
+        "type": type, "author": author, "title": title,
+        "created_from": created_from, "created_to": created_to,
+        "keyword": keyword, "text": text, "limit": limit,
+    }.items():
+        if value is not None:
+            payload[key] = value
+
+    body = _request("POST", "/labnotes", json=payload, timeout=_LABNOTES_TIMEOUT_SECONDS)
+    return LabnotesResponse(answer=body["answer"], sources=body.get("sources", []), attachments=body.get("attachments", []))
