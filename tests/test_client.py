@@ -220,7 +220,7 @@ def test_labnotes_sends_only_explicitly_passed_filters(monkeypatch, configured):
     def fake_request(method, url, headers=None, timeout=None, **kwargs):
         captured["json"] = kwargs.get("json")
         captured["timeout"] = timeout
-        return FakeResponse(200, {"answer": "the answer", "sources": [], "attachments": []})
+        return FakeResponse(200, {"text": "the answer", "sources": [], "attachments": []})
 
     monkeypatch.setattr(httpx, "request", fake_request)
 
@@ -240,7 +240,7 @@ def test_labnotes_reasoning_false_included_in_payload(monkeypatch, configured):
 
     def fake_request(method, url, headers=None, **kwargs):
         captured["json"] = kwargs.get("json")
-        return FakeResponse(200, {"answer": "ok", "sources": [], "attachments": []})
+        return FakeResponse(200, {"text": "ok", "sources": [], "attachments": []})
 
     monkeypatch.setattr(httpx, "request", fake_request)
 
@@ -251,7 +251,7 @@ def test_labnotes_reasoning_false_included_in_payload(monkeypatch, configured):
 
 def test_labnotes_parses_answer_sources_attachments_and_usage(monkeypatch, configured):
     monkeypatch.setattr(httpx, "request", lambda *a, **k: FakeResponse(200, {
-        "answer": "CaMKII levels rose after stimulation.",
+        "text": "CaMKII levels rose after stimulation.",
         "sources": [{"nid": 17, "title": "t", "author": "tannishtha", "created": "2020-01-01", "type": "bhalla_lab_note"}],
         "attachments": [{"content_type": "image/png", "size_bytes": 3, "data_base64": "abc"}],
         "usage": {"iterations": 3, "total_prompt_tokens": 500, "total_completion_tokens": 200, "total_time": 12.3},
@@ -259,8 +259,8 @@ def test_labnotes_parses_answer_sources_attachments_and_usage(monkeypatch, confi
 
     result = client.labnotes("What did Tannishtha find?")
 
-    assert result.answer == "CaMKII levels rose after stimulation."
-    assert str(result) == result.answer
+    assert result.text == "CaMKII levels rose after stimulation."
+    assert str(result) == result.text
     assert result.sources[0]["nid"] == 17
     assert result.attachments[0]["content_type"] == "image/png"
     assert result.usage["iterations"] == 3

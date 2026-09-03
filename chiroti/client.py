@@ -17,7 +17,7 @@ from chiroti.exceptions import (
     OutputValidationError,
     UnsupportedFeatureError,
 )
-from chiroti.response import ChirotiResponse, LabnotesResponse
+from chiroti.response import AskResponse, LabnotesResponse
 
 _STATUS_TO_ERROR = {
     400: InvalidInputError,
@@ -63,7 +63,7 @@ def ask(
     output_format: type[BaseModel] | None = None,
     cache: bool | None = None,
     **openai_kwargs: Any,
-) -> ChirotiResponse:
+) -> AskResponse:
     if not prompt.strip():
         raise InvalidInputError("prompt must not be empty")
 
@@ -94,7 +94,7 @@ def ask(
         except ValidationError as e:
             raise OutputValidationError(f"model output didn't match output_format: {e}", raw_text=text) from e
 
-    return ChirotiResponse(
+    return AskResponse(
         text=text,
         token_count=body.get("token_count"),
         prompt_tokens=body.get("prompt_tokens"),
@@ -140,7 +140,7 @@ def labnotes(
 
     body = _request("POST", "/labnotes", json=payload, timeout=_LABNOTES_TIMEOUT_SECONDS)
     return LabnotesResponse(
-        answer=body["answer"],
+        text=body["text"],
         sources=body.get("sources", []),
         attachments=body.get("attachments", []),
         usage=body.get("usage", {}),

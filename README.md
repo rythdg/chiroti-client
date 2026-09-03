@@ -54,10 +54,11 @@ to the model: `temperature`, `top_p`, `n`, `stop`, `presence_penalty`,
 
 ## What `ask()` returns
 
-`ask()` returns a `ChirotiResponse`, not a plain string — it prints and
-`str()`s exactly like one (`print(chiroti.ask(...))` just works), but if
-you're doing string operations (concatenation, `.split()`, f-strings that
-need a real `str`, ...) use `.text` explicitly:
+`ask()` returns an `AskResponse`, not a plain string — it prints and
+`str()`s exactly like one (`print(chiroti.ask(...))` just works), and in
+Jupyter it renders as formatted Markdown automatically. If you're doing
+string operations (concatenation, `.split()`, f-strings that need a real
+`str`, ...) use `.text` explicitly:
 
 ```python
 result = chiroti.ask("Explain what's happening in this data.", data="trial1.csv")
