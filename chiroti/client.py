@@ -6,8 +6,8 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from chiroti.attachments import prepare_attachments
 from chiroti.config import get_server, get_token
-from chiroti.data import data_to_text
 from chiroti.exceptions import (
     AuthenticationError,
     ChirotiConnectionError,
@@ -55,9 +55,7 @@ def ask(
     prompt: str,
     *,
     model: str | None = None,
-    image=None,
-    document=None,
-    data: str | Path | list[str | Path] | None = None,
+    attachment: str | Path | list[str | Path] | None = None,
     max_tokens: int | None = None,
     reasoning: bool = True,
     output_format: type[BaseModel] | None = None,
@@ -67,14 +65,13 @@ def ask(
     if not prompt.strip():
         raise InvalidInputError("prompt must not be empty")
 
-    not_yet_implemented = {"image": image, "document": document, "cache": cache}
-    for name, value in not_yet_implemented.items():
-        if value is not None:
-            raise NotImplementedError(f"{name}= is not implemented yet")
+    if cache is not None:
+        raise NotImplementedError("cache= is not implemented yet")
 
-    if data is not None:
-        paths = [data] if isinstance(data, (str, Path)) else list(data)
-        prompt = f"{prompt}\n\n{data_to_text(paths)}"
+    uploads = []
+    if attachment is not None:
+        paths = [attachment] if isinstance(attachment, (str, Path)) else list(attachment)
+        prompt, uploads = prepare_attachments(prompt, paths)
 
     payload = {"prompt": prompt, "reasoning": reasoning, **openai_kwargs}
     if model is not None:
@@ -83,6 +80,8 @@ def ask(
         payload["max_tokens"] = max_tokens
     if output_format is not None:
         payload["output_format"] = output_format.model_json_schema()
+    if uploads:
+        payload["attachments"] = uploads
 
     body = _request("POST", "/ask", json=payload)
     text = body["text"]

@@ -1,3 +1,5 @@
+import base64
+
 import httpx
 import pytest
 from pydantic import BaseModel
@@ -116,7 +118,7 @@ def test_client_output_format_on_unsupported_model_raises_unsupported_feature_er
         client.ask("Extract conditions.", output_format=Experiment)
 
 
-def test_client_ask_data_appends_json_block_to_prompt(monkeypatch, configured, tmp_path):
+def test_client_ask_attachment_csv_appends_json_block_to_prompt(monkeypatch, configured, tmp_path):
     csv_path = tmp_path / "a.csv"
     csv_path.write_text("x,y\n1,2\n")
     captured = {}
@@ -127,10 +129,100 @@ def test_client_ask_data_appends_json_block_to_prompt(monkeypatch, configured, t
 
     monkeypatch.setattr(httpx, "request", fake_request)
 
-    client.ask("Summarize.", data=str(csv_path))
+    client.ask("Summarize.", attachment=str(csv_path))
 
     assert captured["json"]["prompt"].startswith("Summarize.\n\n### Data\n```json")
     assert '"x": "1"' in captured["json"]["prompt"]
+    assert "attachments" not in captured["json"]
+
+
+def test_client_ask_attachment_none_sends_plain_prompt_payload(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("hi")
+
+    assert captured["json"] == {"prompt": "hi", "reasoning": True}
+
+
+def test_client_ask_attachment_image_sends_attachments_list_in_payload(monkeypatch, configured, tmp_path):
+    png_path = tmp_path / "figure.png"
+    png_path.write_bytes(b"\x89PNG\r\n\x1a\nfakepngbytes")
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("Describe this.", attachment=str(png_path))
+
+    assert captured["json"]["prompt"] == "Describe this."
+    assert len(captured["json"]["attachments"]) == 1
+    upload = captured["json"]["attachments"][0]
+    assert upload["filename"] == "figure.png"
+    assert upload["content_type"] == "image/png"
+    assert base64.b64decode(upload["data_base64"]) == png_path.read_bytes()
+
+
+def test_client_ask_attachment_pdf_sends_attachments_list_in_payload(monkeypatch, configured, tmp_path):
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fakepdfbytes")
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("Summarize this.", attachment=str(pdf_path))
+
+    assert len(captured["json"]["attachments"]) == 1
+    assert captured["json"]["attachments"][0]["content_type"] == "application/pdf"
+
+
+def test_client_ask_attachment_mixed_image_and_csv_sends_both_prompt_text_and_attachments_list(
+    monkeypatch, configured, tmp_path
+):
+    png_path = tmp_path / "figure.png"
+    png_path.write_bytes(b"\x89PNG\r\n\x1a\nfakepngbytes")
+    csv_path = tmp_path / "a.csv"
+    csv_path.write_text("x,y\n1,2\n")
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("Analyze this.", attachment=[str(png_path), str(csv_path)])
+
+    assert captured["json"]["prompt"].startswith("Analyze this.\n\n### Data\n```json")
+    assert len(captured["json"]["attachments"]) == 1
+    assert captured["json"]["attachments"][0]["content_type"] == "image/png"
+
+
+def test_client_ask_attachment_unsupported_extension_raises_before_any_network_call(monkeypatch, configured, tmp_path):
+    txt_path = tmp_path / "notes.txt"
+    txt_path.write_text("hello")
+
+    def fake_request(*a, **k):
+        raise AssertionError("no network call should happen")
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    with pytest.raises(InvalidInputError):
+        client.ask("Summarize.", attachment=str(txt_path))
+
+
 
 
 def test_client_get_server_defaults_to_chiroti_host_when_unconfigured(monkeypatch, tmp_path):

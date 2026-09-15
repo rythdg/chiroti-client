@@ -14,6 +14,8 @@ import numpy as np
 
 from chiroti.exceptions import InvalidInputError
 
+DATA_EXTENSIONS = {".csv", ".npz"}
+
 
 def _csv_file_to_json(path: Path) -> dict:
     with path.open(newline="") as f:
@@ -37,7 +39,7 @@ def data_to_text(paths: list[str]) -> str:
     resolved = [Path(p) for p in paths]
     csv_paths = [p for p in resolved if p.suffix.lower() == ".csv"]
     npz_paths = [p for p in resolved if p.suffix.lower() == ".npz"]
-    unknown = [p for p in resolved if p.suffix.lower() not in (".csv", ".npz")]
+    unknown = [p for p in resolved if p.suffix.lower() not in DATA_EXTENSIONS]
     if unknown:
         raise InvalidInputError(f"unsupported data file type(s): {unknown} — only .csv and .npz are supported")
 
