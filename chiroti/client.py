@@ -30,7 +30,7 @@ _STATUS_TO_ERROR = {
 # httpx's default is 5s, far too short for LLM generation; give it minutes instead.
 _DEFAULT_TIMEOUT_SECONDS = 300.0
 # labnotes() may run several sequential model + Labnotes API round trips server-side.
-_LABNOTES_TIMEOUT_SECONDS = 900.0
+_LABNOTES_TIMEOUT_SECONDS = 5000.0
 
 
 def _request(method: str, path: str, timeout: float = _DEFAULT_TIMEOUT_SECONDS, **kwargs: Any) -> Any:
