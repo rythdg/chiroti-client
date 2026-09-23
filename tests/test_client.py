@@ -223,6 +223,66 @@ def test_client_ask_attachment_unsupported_extension_raises_before_any_network_c
         client.ask("Summarize.", attachment=str(txt_path))
 
 
+def test_client_ask_user_kwarg_is_equivalent_to_positional_prompt(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask(user="hi")
+
+    assert captured["json"] == {"prompt": "hi", "reasoning": True}
+
+
+def test_client_ask_system_kwarg_included_in_payload(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("hi", system="You are terse.")
+
+    assert captured["json"] == {"prompt": "hi", "reasoning": True, "system": "You are terse."}
+
+
+def test_client_ask_system_omitted_from_payload_when_not_given(monkeypatch, configured):
+    captured = {}
+
+    def fake_request(method, url, headers=None, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(200, {"text": "ok", "model": "m"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    client.ask("hi")
+
+    assert "system" not in captured["json"]
+
+
+def test_client_ask_both_prompt_and_user_raises_invalid_input_error(monkeypatch, configured):
+    def fake_request(*a, **k):
+        raise AssertionError("no network call should happen")
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+
+    with pytest.raises(InvalidInputError):
+        client.ask("hi", user="hi again")
+
+
+def test_client_ask_neither_prompt_nor_user_raises_invalid_input_error():
+    with pytest.raises(InvalidInputError):
+        client.ask()
+
+
+def test_client_ask_system_only_raises_invalid_input_error():
+    with pytest.raises(InvalidInputError):
+        client.ask(system="You are terse.")
 
 
 def test_client_get_server_defaults_to_chiroti_host_when_unconfigured(monkeypatch, tmp_path):

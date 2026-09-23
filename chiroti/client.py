@@ -52,8 +52,10 @@ def _request(method: str, path: str, timeout: float = _DEFAULT_TIMEOUT_SECONDS, 
 
 
 def ask(
-    prompt: str,
+    prompt: str | None = None,
     *,
+    system: str | None = None,
+    user: str | None = None,
     model: str | None = None,
     attachment: str | Path | list[str | Path] | None = None,
     max_tokens: int | None = None,
@@ -62,7 +64,11 @@ def ask(
     cache: bool | None = None,
     **openai_kwargs: Any,
 ) -> AskResponse:
-    if not prompt.strip():
+    if prompt is not None and user is not None:
+        raise InvalidInputError("pass the prompt either positionally or as user=, not both")
+    prompt = prompt if prompt is not None else user
+
+    if not prompt or not prompt.strip():
         raise InvalidInputError("prompt must not be empty")
 
     if cache is not None:
@@ -74,6 +80,8 @@ def ask(
         prompt, uploads = prepare_attachments(prompt, paths)
 
     payload = {"prompt": prompt, "reasoning": reasoning, **openai_kwargs}
+    if system is not None:
+        payload["system"] = system
     if model is not None:
         payload["model"] = model
     if max_tokens is not None:
