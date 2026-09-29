@@ -62,6 +62,7 @@ def ask(
     reasoning: bool = True,
     output_format: type[BaseModel] | None = None,
     cache: bool | None = None,
+    timeout: float = _DEFAULT_TIMEOUT_SECONDS,
     **openai_kwargs: Any,
 ) -> AskResponse:
     if prompt is not None and user is not None:
@@ -91,7 +92,7 @@ def ask(
     if uploads:
         payload["attachments"] = uploads
 
-    body = _request("POST", "/ask", json=payload)
+    body = _request("POST", "/ask", timeout=timeout, json=payload)
     text = body["text"]
 
     parsed = None
