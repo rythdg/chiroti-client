@@ -54,15 +54,46 @@ def test_mixed_image_and_csv_attachment_in_same_call_produces_both_prompt_text_a
 
 
 def test_unsupported_extension_raises_invalid_input_error_listing_all_supported_extensions(tmp_path):
-    txt_path = tmp_path / "notes.txt"
-    txt_path.write_text("hello")
+    zip_path = tmp_path / "notes.zip"
+    zip_path.write_text("hello")
 
     with pytest.raises(InvalidInputError) as exc_info:
-        prepare_attachments("Summarize.", [str(txt_path)])
+        prepare_attachments("Summarize.", [str(zip_path)])
 
     message = str(exc_info.value)
-    for ext in [".csv", ".npz", ".png", ".jpg", ".jpeg", ".pdf"]:
+    for ext in [".csv", ".npz", ".png", ".jpg", ".jpeg", ".pdf", ".md", ".txt"]:
         assert ext in message
+
+
+@pytest.mark.parametrize("name", ["notes.txt", "notes.md", "NOTES.TXT"])
+def test_text_attachment_injected_into_prompt_under_filename_header(tmp_path, name):
+    path = tmp_path / name
+    path.write_text("# hello\nworld")
+
+    prompt, uploads = prepare_attachments("Summarize.", [str(path)])
+
+    assert prompt == f"Summarize.\n\n### {name}\n```\n# hello\nworld\n```"
+    assert uploads == []
+
+
+def test_mixed_text_and_image_attachment_produces_both_prompt_text_and_upload(tmp_path):
+    md_path = tmp_path / "notes.md"
+    md_path.write_text("some notes")
+    png_path = tmp_path / "figure.png"
+    png_path.write_bytes(b"\x89PNG\r\n\x1a\nfakepngbytes")
+
+    prompt, uploads = prepare_attachments("Analyze.", [str(md_path), str(png_path)])
+
+    assert "### notes.md" in prompt
+    assert [u["content_type"] for u in uploads] == ["image/png"]
+
+
+def test_non_utf8_text_attachment_raises_invalid_input_error(tmp_path):
+    path = tmp_path / "bad.txt"
+    path.write_bytes(b"\xff\xfe\x00bad")
+
+    with pytest.raises(InvalidInputError, match="bad.txt"):
+        prepare_attachments("Summarize.", [str(path)])
 
 
 def test_content_type_derived_from_extension_not_sniffed(tmp_path):

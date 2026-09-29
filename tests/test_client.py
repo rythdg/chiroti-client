@@ -211,8 +211,8 @@ def test_client_ask_attachment_mixed_image_and_csv_sends_both_prompt_text_and_at
 
 
 def test_client_ask_attachment_unsupported_extension_raises_before_any_network_call(monkeypatch, configured, tmp_path):
-    txt_path = tmp_path / "notes.txt"
-    txt_path.write_text("hello")
+    zip_path = tmp_path / "notes.zip"
+    zip_path.write_text("hello")
 
     def fake_request(*a, **k):
         raise AssertionError("no network call should happen")
@@ -220,7 +220,7 @@ def test_client_ask_attachment_unsupported_extension_raises_before_any_network_c
     monkeypatch.setattr(httpx, "request", fake_request)
 
     with pytest.raises(InvalidInputError):
-        client.ask("Summarize.", attachment=str(txt_path))
+        client.ask("Summarize.", attachment=str(zip_path))
 
 
 def test_client_ask_user_kwarg_is_equivalent_to_positional_prompt(monkeypatch, configured):

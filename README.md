@@ -116,6 +116,10 @@ Notes:
   client-side truncation.
 - This is pure client-side text preparation. No file is uploaded anywhere;
   Chiroti just builds a bigger text prompt.
+- The current API takes files through `attachment=` (a path or list of paths):
+  `.csv`, `.npz`, `.png`, `.jpg`/`.jpeg`, `.pdf`, and plain-text `.md`/`.txt`
+  files, which are UTF-8 read and appended to the prompt under a
+  `### filename` header.
 
 ## Getting structured output back — `output_format=`
 
