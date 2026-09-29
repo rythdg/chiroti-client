@@ -1,4 +1,5 @@
 import base64
+import json
 
 import pytest
 
@@ -86,6 +87,51 @@ def test_mixed_text_and_image_attachment_produces_both_prompt_text_and_upload(tm
 
     assert "### notes.md" in prompt
     assert [u["content_type"] for u in uploads] == ["image/png"]
+
+
+@pytest.mark.parametrize("name", ["a.py", "a.c", "a.m", "a.h", "a.json"])
+def test_source_code_attachment_injected_as_text(tmp_path, name):
+    path = tmp_path / name
+    path.write_text("x = 1;")
+
+    prompt, uploads = prepare_attachments("Explain.", [str(path)])
+
+    assert prompt == f"Explain.\n\n### {name}\n```\nx = 1;\n```"
+    assert uploads == []
+
+
+def test_ipynb_keeps_cell_sources_and_drops_outputs(tmp_path):
+    nb = {
+        "cells": [
+            {"cell_type": "markdown", "source": ["# Title\n", "text"]},
+            {"cell_type": "code", "source": "print(1)", "outputs": [{"data": {"image/png": "HUGEBASE64"}}]},
+        ]
+    }
+    path = tmp_path / "nb.ipynb"
+    path.write_text(json.dumps(nb))
+
+    prompt, _ = prepare_attachments("Explain.", [str(path)])
+
+    assert "# [markdown cell 1]\n# Title\ntext" in prompt
+    assert "# [code cell 2]\nprint(1)" in prompt
+    assert "HUGEBASE64" not in prompt
+
+
+def test_invalid_ipynb_raises_invalid_input_error(tmp_path):
+    path = tmp_path / "nb.ipynb"
+    path.write_text("not json")
+
+    with pytest.raises(InvalidInputError, match="nb.ipynb"):
+        prepare_attachments("Explain.", [str(path)])
+
+
+def test_fence_grows_past_backticks_inside_the_file(tmp_path):
+    path = tmp_path / "notes.md"
+    path.write_text("```python\nx\n```")
+
+    prompt, _ = prepare_attachments("Hi.", [str(path)])
+
+    assert prompt == "Hi.\n\n### notes.md\n````\n```python\nx\n```\n````"
 
 
 def test_non_utf8_text_attachment_raises_invalid_input_error(tmp_path):
